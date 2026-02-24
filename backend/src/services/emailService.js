@@ -1,37 +1,49 @@
 const nodemailer = require('nodemailer');
 const logger = require('../utils/logger');
 
-// Create transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: process.env.SMTP_PORT === '465',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-});
+let transporter = null;
 
-// Verify connection
-transporter.verify((error, success) => {
-  if (error) {
-    logger.error('SMTP connection error:', error);
-  } else {
-    logger.info('SMTP server is ready to take messages');
-  }
-});
+// Only initialize email if explicitly enabled
+if (process.env.ENABLE_EMAIL === 'true') {
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    secure: process.env.SMTP_PORT === '465',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
 
+  transporter.verify((error) => {
+    if (error) {
+      logger.error('SMTP connection error:', error);
+    } else {
+      logger.info('SMTP server is ready to take messages');
+    }
+  });
+
+  logger.info('📧 Email service enabled');
+} else {
+  logger.info('📧 Email service disabled');
+}
+
+// ============================
+// Generic Send Email
+// ============================
 exports.sendEmail = async (options) => {
+  if (!transporter) {
+    logger.warn('Email skipped (service disabled)');
+    return;
+  }
+
   const mailOptions = {
     from: `"Service Brand" <${process.env.EMAIL_FROM}>`,
     to: options.to,
     subject: options.subject,
-    html: options.html
+    html: options.html,
+    attachments: options.attachments || []
   };
-
-  if (options.attachments) {
-    mailOptions.attachments = options.attachments;
-  }
 
   try {
     const info = await transporter.sendMail(mailOptions);
@@ -42,7 +54,13 @@ exports.sendEmail = async (options) => {
     throw error;
   }
 };
+
+// ============================
+// Contact Email
+// ============================
 exports.sendContactEmail = async (contactData) => {
+  if (!transporter) return;
+
   const html = `
     <h2>New Contact Form Submission</h2>
     <p><strong>Name:</strong> ${contactData.name}</p>
@@ -63,7 +81,12 @@ exports.sendContactEmail = async (contactData) => {
   });
 };
 
+// ============================
+// Welcome Email
+// ============================
 exports.sendWelcomeEmail = async (user) => {
+  if (!transporter) return;
+
   const html = `
     <h2>Welcome ${user.name}!</h2>
     <p>Thank you for registering with us. We're excited to have you on board.</p>
