@@ -26,10 +26,14 @@ const startServer = async () => {
     logger.info('Database connection established successfully.');
 
     // Sync database (in production, use migrations instead)
-    if (process.env.NODE_ENV === 'development') {
-      await sequelize.sync({ alter: true });
-      logger.info('Database synced successfully');
-    }
+    // Sync database// Sync database only in development OR if explicitly enabled
+if (
+  process.env.NODE_ENV === 'development' ||
+  process.env.FORCE_SYNC === 'true'
+) {
+  await sequelize.sync({ alter: true });
+  logger.info('Database synced successfully');
+}
 
     // Start server
     server = app.listen(PORT, () => {
